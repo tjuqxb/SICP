@@ -1,0 +1,4 @@
+;在LOUIS的版本中
+(apply map (evalist (list func args)))
+
+;最终func evluate出的一个结果是一个闭包，而不是一个基本过程， 系统调用MAP会出错。

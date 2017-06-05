@@ -1,0 +1,18 @@
+(define (make-serializer n)
+  (let ((mutex0 (make-mutex)))
+    (define (iter m)
+      (mutex0 'acquire)
+      (cond ((< m n))
+             ((set! m (+ m 1))
+              (lambda (p)
+               (define (signal-p .args)
+                 (let ((val (apply p args)))
+                         (set! m (- m 1))
+                         (mutex0 'release)
+                          val))
+                         (signal-p))))
+            ((= m n)
+             (iter m))))
+      (iter 0)))
+            
+               

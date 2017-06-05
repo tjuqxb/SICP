@@ -1,0 +1,24 @@
+;;Previous function will be raised to complete the task.The apply-generic process will be raised twice.
+;;(get 'real-part '(complex))--real-part  (get 'real-part '(rectangular))
+
+(define (type-tag x)
+  (cond ((pair? x)
+          (car x))
+         ((number? x)
+          'number)
+         (else error "Bad tagged datum--TYPE-TAG" x)))
+
+
+(define (contents x)
+  (cond ((pair? x)
+         (cdr x))
+        ((number? x)
+         x)
+        (else "Bad tagged datum--CONTENTS" x)))
+
+
+(define (attach-tag type-tag contens)
+  (if (number? contens)
+      contents
+      (cons type-tag contents)))
+

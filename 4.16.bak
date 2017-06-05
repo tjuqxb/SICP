@@ -1,0 +1,135 @@
+(require "元循环求值器.rkt")
+(define (eval exp env)
+  (cond ((self-evaluating? exp) exp)
+        ((variable? exp) (lookup-variable-value exp env))
+        ((quoted? exp) (text-of-quotation exp))
+        ((assignment? exp) (eval-assignment exp env))
+        ((definition? exp) (eval-definition exp env))
+        ((if? exp) (eval-if exp env))
+        ((while? exp) (eval-while exp env))
+        ((lambda? exp)
+         (make-porocedure (lambda-parameters exp)
+                          (lambda-body exp)
+                          env))
+        ((begin? exp)
+         (eval-sequence (begin-actions exp) env))
+        ((cond? exp) (eval (cond->if exp) env))
+        ((let? exp) (eval (let->combination exp) env))
+        ((let*? exp) (eval (let*->nested-lets exp) env))
+        
+                    
+        ((application? exp)
+         (apply (eval (operator exp) env)
+                (list-of-values (operands exp) env)))
+         (else
+          (error "Unkown expression type--EVAL" exp))))
+
+(define (apply procedure arguments);not so clear about compound-procedure:allows procedure to evaluate different expressions,but only returns the last.
+  (cond ((primitive-procedure? procedure)
+         (apply-primitive-procedure procedure arguments))
+        ((compound-procedure? procedure)
+         (eval-sequence 
+         (scan-out-definess (procedure-body procedure))   ;;;;;;4.16
+          (extend-environment                             ;when evaluate a compound procedure,add a new environment to the closure-packed environment,meanwhile,the procedure's
+           (procedure-parameters procedure)               ;parameters and arguments are the first to be binded in the new environment.The overriding of the parameters of the
+           arguments                                      ;same name could rise bugs,which should be taken care of.Use closure wisely;an early attempt to evaluate the arguments
+           (procedure-environment procedure))))           ;using a compound procedure could pass the right value from the origin environment.See the lecture video.
+        (else
+         (error
+          "Unkown procedure type--APPLY" procedure))))
+
+(define (let? exp)
+  (tagged-list? 'let exp))
+
+(define (let-parameters exp)
+  (define (get-1st list)
+    (cond ((not (pair? list))
+           (error "bad sytax--LET-PARAMETERS"exp))
+          ((not (pair? (car list)))
+           (error "bad sytax--LET-PARAMETERS"exp))
+          ((null? (cdr list))
+           (list (caar list)))
+          (else (cons (caar list) (get-1st (cdr list))))))
+  (get-1st (cadr exp)))
+
+(define (let-body exp)
+  (cond ((null? (cddr exp))
+         (error "no expression in body" exp))
+        (else (cddr exp))))
+
+(define (let-vals exp)
+  (define (get-2nd list)
+    (cond ((not (pair? list))
+           (error "bad sytax--LET-PARAMETERS"exp))
+          ((not (pair? (car list)))
+           (error "bad sytax--LET-PARAMETERS"exp))
+          ((null? (cdr list))
+           (list (cadar list)))
+          (cons (cadar list) (get-2nd (cdr list)))))
+  (get-2nd (cadr exp)))
+
+ 
+(define (let->combination exp)
+ (cons (make-lambda (let-parameters exp) (let-body exp))
+                     (let-vals exp)))
+
+(define (make-let pair-lists body-exp)
+  (cons 'let (cons pair-lists body-exp)))
+
+
+(define (lookup-variable-value var env)
+  (define (env-loop env)
+    (define (scan vars vals)
+      (cond ((null? vals)
+            (env-loop (enclosing-environment env)))
+            ((eq? var (car vars))
+             (cond ((eq? (car vals) '*unassigned)
+                    (error "Unassigned variable"  var))
+                   (else (car vals))))
+            (else (scan (cdr vars) (cdr vals)))))
+    (if (eq? env the-empty-environment)
+        (error "Unbound variable" var)
+        (let ((frame (first-frame env)))
+          (scan (frame-variables frame)
+                (frame-values frame)))))
+  (env-loop env))
+
+(define (definition->set! exp)
+  (list 'set! (definition-variable exp) (definition-value exp)))
+
+(define (scan-out-definess procedure-body)
+  (define (transform let-pairs set!-sequence non-set!-sequence body-exp)
+    (cond ((null? body-exp)
+          (make-let let-pairs(cons (sequence->exp set!-sequence) non-set!-sequence)))
+          ((definition? (car exp)
+             (cond ((null? set!-sequence)
+                    (transform (cons (list (defintion-variable (car exp)) '*uassigned) nil)
+                               (cons (definition->set! (car exp)) nil)
+                                non-set!-sequence
+                                (cdr body-exp)))
+                   (else
+                    (set-cdr! let-pairs
+                              (cons (list (defintion-variable (car exp)) '*uassigned) (cdr let-pairs)))
+                    (set-cdr! set!-sequence
+                              (cons (definiton->set! (car exp)) (cdr set!-sequence)))
+                    (transform let-pairs set!-sequence non-set!-sequence (cdr (body exp)))))))
+          (else
+           (cond ((null? non-set!-sequence)
+                  (transform let-pairs set!-sequence
+                             (cons (car body-exp) nil)
+                             (cdr body-exp)))
+                 (else
+                  (set-cdr! non-set!-sequence (cons (car body-exp) (cdr non-set!-sequence)))
+                  (transform let-pairs set!-sequence non-set!-sequence (cdr (body exp))))))))
+  (transform nil nil nil procedure-body))
+
+
+;procedure-body 里好一些，避免会不停地深度替换。
+
+
+                  
+                              
+                              
+
+
+

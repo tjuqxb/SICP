@@ -1,0 +1,81 @@
+"""
+Y combinator
+如何用LAMBDA匿名函数表达递归
+我们理解的一个普通递归表达式为（当(g x)到达某个值时，函数会返回一个我们之前规定的值，然后通过我们之前展开的空间进行还原，我们得到所求的值。
+(lambda(x)
+  (f (self (g x))))
+
+其中self为指向自身的指针，如下方所示。
+我们用LAMBDA匿名函数展开这个表达式，发现这是个无限展开的表达式，原因是它采用了self指针。
+
+
+(lambda(x)
+  ((lambda(s)
+     (f (s (g x))))
+   self))
+
+=>
+
+(lambda(x)
+  ((lambda(s)
+    (f (s (g x))))
+    (lambda(x) 
+      (lambda(s)
+        (f s (g x)))
+   ......
+
+我们的目标是寻求这样一个匿名函数的不包含self指针的写法(即它们是等价的LAMBDA表达式，我们所求的不包含self指针，所以是有限的。)
+                                               
+令没有 self形式的匿名函数为 
+    (lambda(x) (M x))
+令 m = (lambda(x) (M x))
+由于m是我们之前设定的匿名函数的等价形式，代入m之后，我们之前无限展开的lambda表达式现在可以写成
+(lambda(x)
+  ((lambda(s)
+     (f (s (g x))))
+   m))
+=>
+(lambda(x)
+  (f (m (g x))))
+代入这样有限的不包含self指针的一个等价形式(即m)之后，
+我们发现该匿名函数也是一个不包含self指针的有限形式了，那么此时的匿名函数和m事实上是等价的。
+
+(lambda(x)
+  (f (m (g x)))) = m
+      
+我们构造一个k
+
+k = (lambda(a)
+      (lambda(x)
+        (f ((a a) (g x)))))
+k是一个泛函形式，它可以接收函数，返回函数。我们将k自身代入k
+
+(k k)
+=>
+(lambda(x)
+  (f ((k k) (g x))))
+
+我们发现 (k k) 即是 m ,因为
+
+（k k) = (lambda(x)
+          (f ((k k) (g x))))
+      
+所以我们所求的有限无SELF指针形式为
+
+((lambda(a)
+   (lambda(x)
+     (f ((a a) (g x)))))
+ (lambda(a)
+   (lambda(x)
+     (f ((a a) (g x))))))
+"""
+
+      
+    
+      
+      
+      
+
+    
+     
+      

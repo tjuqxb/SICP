@@ -1,0 +1,13 @@
+(define (augend s)
+  (if (not (pair? (cdddr s)))
+      (caddr s)
+      (append '(+) (caddr s))))
+
+
+
+(define (multiplicand s)
+  (if (not (pair? (cdddr s)))
+      (caddr s)
+      (append '(*) (caddr s))))
+
+

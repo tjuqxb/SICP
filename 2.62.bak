@@ -1,0 +1,28 @@
+(define (union-set set1 set2)
+  (define (iter s1 s2 s3)
+    (cond ((null? s1)
+           (append s3 s2))
+          ((null? s2)
+           (append s3 s2))
+          ((= (car s1)
+              (car 2))
+           (iter (cdr s1)
+                 (cdr s2)
+                 (cons (car s1)
+                       s3)))
+          ((<(car s1)
+             (car s2))
+           (iter (cdr s1)
+                 s2
+                 (cons (car s1)
+                       s3)))
+          (else (iter s1
+                      (cdr s2)
+                      (cons (car s2)
+                            s3)))))
+  (iter set1 set2 nil))
+
+
+
+        
+     

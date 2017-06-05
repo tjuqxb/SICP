@@ -1,0 +1,11 @@
+(define (cal-1 s)
+  (cons-stream
+   1
+   (mul-series
+    (stream-map
+     (lambda(x)
+       (- 0 x))
+     (stream-cdr s))
+    (cal-1 s))))
+
+

@@ -1,0 +1,17 @@
+(define (loop? m)
+  (let ((pair-list nil))
+    (define (add-pair pair)
+      (set! (pair-list)
+            (cons pair pair-list)))
+    (define (judge? m)
+      (if (null? (cdr m))
+          #f
+          (cond ((not (memq (cdr m) pair-list))
+                 (add-pair (cdr m))
+                 (judge? (cdr m)))
+                (else #t))))
+    (judge? m)))
+
+
+
+    

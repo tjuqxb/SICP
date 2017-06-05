@@ -1,0 +1,22 @@
+(define (mul-series s1 s2)
+  (let ((ss1 (integrate-series s1))
+        (ss2 (integrate-series s2)))
+    (con-stream 
+     (* (stream-car ss1)
+        (stream-car ss2))
+     (add-streams
+      (mul-series (stream-cdr s1)
+                  (stream-cdr s2))
+      (add-streams
+       (stream-map (lambda(x)
+                     (* x
+                        (stream-car ss1)))
+                   (stream-cdr ss2))
+       (stream-map (lambda(x)
+                     (* x
+                        (stream-car ss2)))
+                     (stream-cdr ss1)))))))
+
+
+                   
+      

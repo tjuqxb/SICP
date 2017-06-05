@@ -1,0 +1,54 @@
+;确定同一性的方法
+;                          (define q (m x))
+;此后对q的引用一定是同一个对象
+
+;                          (let ((q (m x)))
+;let内部对q的引用一定是同一个对象
+;泛函形式通过set!可以保存和改变环境变量（let set!)
+
+(define (k x)
+  (let ((m 1) (n 1))
+    (lambda()
+      (set! m (+ m n))
+      m)))
+
+(define (k1 x)
+  (let ((m 1) (n 1))
+    (set! m (+ m n))
+    m))
+
+(define (k2 x)
+  (let ((m 1) (n 1))
+    (define (z)
+    (set! m (+ m n))
+      m)
+    z))
+
+(define q
+  (cons 1
+        (k 1)))
+
+(cdr q) ;单纯的(cdr q)返回(k 1);一个匿名函数
+
+((cdr q));调用函数改变环境变量
+
+((cdr q));可以多次调用，证明是同一个对象
+
+
+(define s (k 1))
+
+(define s1 (k1 1))
+
+(define s2 (k2 1))
+
+(s)
+
+(s)
+
+s1
+
+s1
+
+(s2)
+
+(s2)

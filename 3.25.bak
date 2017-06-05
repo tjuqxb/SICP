@@ -1,0 +1,24 @@
+(define (lookup key-list table)
+  (define (iter list table)
+    (cond  ((null? list)
+            false)
+           ((null? (cdr list))
+           (let ((record (assoc (car list) (cdr table))))
+             (if (and record (not (pair? (cdr record))))
+                 (cdr record)
+                 false))
+           ((pair? (cdr list))
+            (let ((subtable (assoc (car list) (cdr table))))
+              (if (and subtable (pair? (cdr subtable)))
+                  (iter (cdr list) (cdr subtable))
+                  false))))))
+  (lookup key-list table))
+
+
+(define (insert! key-list value table)
+  (define (iter list value mtable)
+    (cond ((null? (cdr list))
+           (let ((record (assoc (car list) (cdr mtable))))
+             (if record
+                 (set-cdr! record value)
+                 (set-cdr! (

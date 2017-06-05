@@ -1,0 +1,400 @@
+;第一行的提前定义基于这样的原理:
+;根据DEFINE的定义，我们可以清晰地看到，如果DEFINE后跟着的是一个函数定义，则函数体会和当时环境打包，不做求值。但环境其实是指针，由define!和set-variable!操作
+;所以如果后续对函数体内的未定义函数进行定义时，环境是会更新的，即包内环境也更新了。这样在求解当时未定义函数时不会出现未知函数的情况。
+;而DEFINE后是符号时，不会用LAMBDA对函数体打包，而是直接求值，这样，编译时未知的函数会发出警告，无法编译通过，而已知的函数会直接绑定。
+;这样，只有在我们定义APPLY前采用符号直接定义APPLY才能保存系统的APPLY，其他的任何方法（即无论在什么位置用函数而不是用符号定义APPLY或者在我们定义APPLY之后用符号定义APPLY
+;都只会和我们自己定义的APPLY绑定，而不是和系统APPLY绑定。
+;另外函数求值的特殊性质还在于，求解时采用EXTEND方法扩充原环境而不是对原环境指针进行改变。所以同一环境下对不同函数的求值可以视作在原函数环境下长出的不同分支。
+;而不同函数之间共享“参数”的方法，除了使用符号共享外，还可使用compound-procedure的方法等，即任何可以直接EVAL得到结果并绑定参数的表达式，而不是LAMBDA体内的过程。因为LAMBDA只有在
+;compound-procedure内才会解包，而如果有两层以上的外围环境的话同名参数可能已经覆盖掉我们想要传递的参数（见讲座），或者根本就没有绑定要传递的参数，即相隔一层是无法传递的。
+;(define (add x)
+;  (cons x y))
+
+;(define (m a y)
+;  (add a))
+
+;(m 1 2)
+;上面这一段在我们自己写的元循环求值器中是可以编译通过的，但(m 1 2)会出现y未绑定的情况，因为实际上是无法隔层传递的，中间这一层只有使用参数y传递才能向下传递。在racket环境中.
+;实际上(define (add x) (cons x y))是无法编译通过的。
+
+(define apply-in-underlying-scheme apply);定义在我们定义apply求值器之前,因为我们命名为APPLY定义是模仿原SCHEME的APPLY定义,为防止冲突。e.g. (apply + (list 4 6))
+
+(define (apply procedure arguments);not so clear about compound-procedure:allows procedure to evaluate different expressions,but only returns the last.
+  (cond ((primitive-procedure? procedure)
+         (apply-primitive-procedure procedure arguments))
+        ((compound-procedure? procedure)
+         (eval-sequence 
+          (procedure-body procedure)
+          (extend-environment                             ;when evaluate a compound procedure,add a new environment to the closure-packed environment,meanwhile,the procedure's
+           (procedure-parameters procedure)               ;parameters and arguments are the first to be binded in the new environment.The overriding of the parameters of the
+           arguments                                      ;same name could rise bugs,which should be taken care of.Use closure wisely;an early attempt to evaluate the arguments
+           (procedure-environment procedure))))           ;using a compound procedure could pass the right value from the origin environment.See the lecture video.
+        (else
+         (error
+          "Unkown procedure type--APPLY" procedure))))
+
+(define (eval exp env)
+  (cond ((self-evaluating? exp) exp)
+        ((variable? exp) (lookup-variable-value exp env))
+        ((quoted? exp) (text-of-quotation exp))
+        ((assignment? exp) (eval-assignment exp env))
+        ((definition? exp) (eval-definition exp env))
+        ((if? exp) (eval-if exp env))
+        ((lambda? exp)
+         (make-procedure (lambda-parameters exp)
+                          (lambda-body exp)             ;in syntax,its form is list
+                          env))                         ;lambda expression and environment -> closure
+        ((begin? exp)
+         (eval-sequence (begin-actions exp) env))
+        ((cond? exp) (eval (cond->if exp) env))
+        ((application? exp)
+         (apply (eval (operator exp) env)
+                (list-of-values (operands exp) env)))     ;evaluate the arguments before the extending-environment procedure.
+         (else
+          (error "Unkonwn" exp))))
+
+
+
+
+
+
+
+(define (list-of-values exps env)
+  (if (no-operands? exps)
+      '()
+      (cons (eval (first-operand exps) env)
+            (list-of-values (rest-operands exps) env))))
+
+(define (rest-operands ops) (cdr ops))
+
+
+
+
+(define (eval-if exp env)
+  (if (true? (eval (if-predicate exp) env))
+      (eval (if-consequent exp) env)
+      (eval (if-alternative exp) env)))
+
+(define (if-alternative exp)
+  (if (not (null? (cdddr exp)))
+      (cadddr exp)
+      'false))
+
+(define (eval-sequence exps env);not so clear about compound-procedure:compound-procedure only returns the last expression's result.
+  (cond ((last-exp? exps) (eval (first-exp exps) env))
+        (else (eval (first-exp exps) env)
+              (eval-sequence (rest-exps exps) env))))
+
+(define (eval-assignment exp env)                   ;assigned in the firstframe
+  (set-variable-values! (assignment-variable exp)
+                       (eval (assignment-value exp) env)
+                       env)
+  'ok)
+
+(define (eval-definition exp env)                   ;defined in the first frame
+  (define-variable! (definition-variable exp)
+                    (eval (definition-value exp) env)
+                     env)
+  'ok)
+
+(define (self-evaluating? exp)
+  (cond ((number? exp) #t)
+        ((string? exp) #t)
+        (else #f)))
+
+(define (variable? exp) (symbol? exp))
+
+(define (quoted? exp)
+  (tagged-list? exp 'quote))
+
+(define (text-of-quotation exp) (cadr exp))   ;(quote a) 'a
+
+(define (tagged-list? exp tag)
+  (if (pair? exp)
+      (eq? (car exp) tag)
+      false))
+
+(define (assignment? exp)
+  (tagged-list? exp 'set!))
+
+(define (assignment-variable exp) (cadr exp))
+
+(define (assignment-value exp) (caddr exp))
+
+(define (definition? exp)
+  (tagged-list? exp 'define))
+
+(define (definition-variable exp)
+  (if (symbol? (cadr exp))
+      (cadr exp)
+      (caadr exp)))
+
+(define (definition-value exp)
+  (if (symbol? (cadr exp))
+      (caddr exp)
+      (make-lambda (cdadr exp) ;formal parameters:stored as a list
+                   (cddr exp)))) ;body:stored as a list,which has not to be a single procedure in syntax,i.e. compound-procedure ,cond, lambda.
+
+(define (lambda? exp) (tagged-list? exp 'lambda))
+
+(define (lambda-parameters exp) (cadr exp))
+
+(define (lambda-body exp) (cddr exp))
+
+(define (make-lambda parameters body)
+  (cons 'lambda (cons parameters body))) ; like compound-procedure, which can be "compound",but only to return the last result.
+
+(define (if? exp) (tagged-list? exp 'if))
+
+(define (if-predicate exp) (cadr exp))
+
+(define (if-consequent exp) (caddr exp))
+
+
+
+(define (make-if predicate consequent alternative)
+  (list 'if predicate consequent alternative))
+
+(define (begin? exp) (tagged-list? exp 'begin))
+
+(define (begin-actions exp) (cdr exp))
+
+(define (last-exp? seq) (null? (cdr seq)))
+
+(define (first-exp seq) (car seq))
+
+(define (rest-exps seq) (cdr seq))
+
+(define (sequence->exp seq)
+  (cond ((null? seq) seq)
+        ((last-exp? seq) (first-exp seq))
+        (else (make-begin seq))))
+
+(define (make-begin seq) (cons 'begin seq))
+
+(define (application? exp) (pair? exp))
+
+(define (operator exp) (car exp))
+
+(define (operands exp) (cdr exp))
+
+(define (no-operands? ops) (null? ops))
+
+(define (first-operand ops) (car ops))
+
+
+
+(define (cond? exp) (tagged-list? exp 'cond))
+
+(define (cond-clauses exp) (cdr exp))
+
+(define (cond-else-clause? clause)
+  (eq? (cond-predicate clause) 'else))
+
+(define (cond-predicate clause) (car clause))
+
+(define (cond-actions clause) (cdr clause))
+
+(define (cond-if exp)
+  (expand-clauses (cond-cluases exp)))
+
+(define (expand-clauses clauses)
+  (if (null? clauses)
+      'false                        ;clause else no
+      (let ((first (car clauses))
+            (rest (cdr clauses)))
+        (if (cond-else-clause? first)
+            (if (null? rest)
+                (sequence->exp (cond-actions first))      ; 'cond' is different from 'if' in syntax,so use sequence->exp to transform 
+                (error "ELSE clause isn't last--COND->IF"
+                       caluses))
+            (make-if (cond-predicate first)
+                     (sequence->exp (cond-actions first))
+                     (expand-clauses rest))))))
+
+;4.1.3
+(define (true? x)
+  (not (eq? x false)))
+
+(define (false? x)
+  (eq? x false))
+
+(define (make-procedure parameters body env)
+  (list 'procedure parameters body env))            ;a closure with environment packed in 
+
+(define (compound-procedure? p)
+  (tagged-list? p 'procedure))
+
+(define (procedure-parameters p) (cadr p))
+
+(define (procedure-body p)(caddr p))
+
+(define (procedure-environment p) (cadddr p))
+
+(define (enclosing-environment env) (cdr env))
+
+(define (first-frame env) (car env))
+
+(define the-empty-environment nil)
+
+(define (make-frame variables values)
+  (cons variables values))
+
+(define (frame-variables frame) (car frame))
+
+(define (frame-values frame) (cdr frame))
+
+(define (add-binding-to-frame! var val frame)
+  (set-car! frame (cons var (car frame)))
+  (set-cdr! frame (cons val (cdr frame))))
+
+(define (extend-environment vars vals base-env)
+  (if (= (length vars) (length vals))
+      (cons (make-frame vars vals) base-env)
+      (if (< (length var) (length vals))
+          (error "Too many arguments supplied" vars vals)
+          (error "Too few arguments supplied" vars vals))))
+
+(define (lookup-variable-value var env)
+  (define (env-loop env)
+    (define (scan vars vals)
+      (cond ((null? vals)
+            (env-loop (enclosing-environment env)))
+            ((eq? var (car vars))
+             (car vals))
+            (else (scan (cdr vars) (cdr vals)))))
+    (if (eq? env the-empty-environment)
+        (error "Unbound variable" var)
+        (let ((frame (first-frame env)))
+          (scan (frame-variables frame)
+                (frame-values frame)))))
+  (env-loop env))
+
+
+(define (set-variable-values! var val env)
+  (define (env-loop env)
+    (define (scan vars vals)
+      (cond ((null? vars)
+             (env-loop (enclosing-environment env)))
+            ((eq? var (car vars))
+             (set-car! vals val))
+            (else (scan (cdr vars) (cdr vals)))))
+    (if (eq? env the-empty-environment)
+        (error "Unbound variable--SET!" var)
+        (let ((frame (first-frame env)))
+          (scan (frame-variables frame)
+                (frame-values frame)))))
+  (env-loop env))
+
+
+(define (define-variable! var val env)
+  (let((frame (first-frame env)))
+    (define (scan vars vals)
+      (cond ((null? vars)
+             (add-binding-to-frame! var val frame))
+            ((eq? var (car vars))
+             (set-car! vals val))
+            (else (scan (cdr vars) (cdr vals)))))
+    (scan (frame-variables frame)
+          (frame-values frame))))
+
+;4.1.4
+(define primitive-procedures
+  (list (list 'car car)
+        (list 'cdr cdr)
+        (list 'cons cons)
+        (list 'null? null?)
+        (list '+ +)
+        (list 'list list)
+        (list '= =)
+        (list '* *)
+        (list '- -)
+       
+        ))
+(define (primitive-procedure-names)
+  (map car
+       primitive-procedures))
+
+(define (primitive-procedure-objects)
+  (map (lambda(proc) (list 'primitive (cadr proc)))
+       primitive-procedures))
+
+(define (setup-environment)
+  (let ((initial-env
+         (extend-environment (primitive-procedure-names)
+                             (primitive-procedure-objects)
+                             the-empty-environment)))
+    (define-variable! 'true true initial-env)
+    (define-variable! 'false false initial-env)
+    
+    initial-env))
+
+(define the-global-environment (setup-environment))
+
+(define (primitive-procedure? proc)
+  (tagged-list? proc 'primitive))
+
+(define (primitive-implementation proc) (cadr proc)) ;e.g.(('null?)(('primitive null?)))
+
+
+
+
+
+ ;(define apply-in-underlying-scheme apply) 定义在我们定义apply求值器之前，因为我们命名为APPLY定义是模仿原SCHEME的APPLY定义，为防止冲突。e.g. (apply + (list 4 6))
+
+(define (apply-primitive-procedure proc args)   ;process under apply process,i.e. apply twice to access the primitive implementation
+  (apply-in-underlying-scheme
+   (primitive-implementation proc) args))
+  
+(define input-prompt ";;;M-Eval input:")
+(define output-prompt ";;;M-Eval value:")
+
+(define (driver-loop)
+  (prompt-for-input input-prompt)
+  (let ((input (read)))                   ;read 类似  getchar()，但返回完整表达式。
+    (let ((output (eval input the-global-environment)))
+      (announce-output output-prompt)
+      (user-print output)))
+  (driver-loop))
+
+(define (prompt-for-input string)
+  (newline) (newline) (display string) (newline))
+
+(define (announce-output string)
+  (newline) (display string) (newline))
+
+(define (user-print object)
+  (if (compound-procedure? object)
+      (display (list 'compound-procedure
+                     (procedure-parameters object)
+                     (procedure-body object)
+                     '<procedure-env>))
+      (display object)))
+
+(define the-global-environment (setup-environment))
+
+
+;;(driver-loop)  
+
+
+
+
+
+
+
+
+
+            
+
+
+
+
+
+
+
+
+
+
+
+
+         
