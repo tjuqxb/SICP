@@ -51,7 +51,8 @@
          (apply (eval (operator exp) env)
                 (list-of-values (operands exp) env)))     ;evaluate the arguments before the extending-environment procedure.
          (else
-          (error "Unkown expression type--EVAL" exp))))
+          (error "Unkonwn" exp))))
+
 
 
 
@@ -85,7 +86,7 @@
               (eval-sequence (rest-exps exps) env))))
 
 (define (eval-assignment exp env)                   ;assigned in the firstframe
-  (set-variable-value! (assignment-variable exp)
+  (set-variable-values! (assignment-variable exp)
                        (eval (assignment-value exp) env)
                        env)
   'ok)
@@ -303,6 +304,12 @@
         (list 'cdr cdr)
         (list 'cons cons)
         (list 'null? null?)
+        (list '+ +)
+        (list 'list list)
+        (list '= =)
+        (list '* *)
+        (list '- -)
+       
         ))
 (define (primitive-procedure-names)
   (map car
@@ -319,6 +326,7 @@
                              the-empty-environment)))
     (define-variable! 'true true initial-env)
     (define-variable! 'false false initial-env)
+    
     initial-env))
 
 (define the-global-environment (setup-environment))
@@ -365,8 +373,8 @@
 
 (define the-global-environment (setup-environment))
 
-(driver-loop)
 
+;;(driver-loop)  
 
 
 

@@ -1,0 +1,23 @@
+(load "元循环求值器.rkt")
+;在应用序中unless作为函数和if就完全不一样，必须完全求值其参数，而if是分支结构的描述语法，不会先求值。
+;派生形式中，unless作为预先设定的语法形式，转化成为if格式的语句。
+
+
+
+(define (unless? expr)
+  (tagged-list? expr 'unless))
+
+(define (unless-predicate expr) (cadr expr))
+
+(define (unless-consequence expr) 
+  (if (not (null? (cdddr expr)))
+      (cadddr expr)
+      'false))
+
+(define (unless-alternative expr)
+  (caddr expr))
+
+(define (unless->if expr)
+  (make-if (unless-predicate expr) (unless-consequence expr) (unless-alternative expr)))
+
+(driver-loop)

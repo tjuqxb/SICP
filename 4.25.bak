@@ -1,0 +1,14 @@
+(define (unless condition usual-value expceptional-value)
+  (if condition
+      exceptional-value
+      usual-value))
+
+(define (factorial n)
+  (unless (= n 1)
+    (* n (factorial (- n 1)))
+    1))
+
+(factorial 5)
+
+;求值factorial过程体里 unless函数参数里有factorial函数，会求值，求值过程中又引用unless函数，从而使求值过程一直进行，无法终止。
+;正则序里，需要求值factorial时函数才会求值，不会出问题。

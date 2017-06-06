@@ -40,6 +40,7 @@
         ((assignment? exp) (eval-assignment exp env))
         ((definition? exp) (eval-definition exp env))
         ((if? exp) (eval-if exp env))
+        ((unless? exp) (eval (unless->if exp) env))
         ((lambda? exp)
          (make-procedure (lambda-parameters exp)
                           (lambda-body exp)             ;in syntax,its form is list
@@ -52,6 +53,24 @@
                 (list-of-values (operands exp) env)))     ;evaluate the arguments before the extending-environment procedure.
          (else
           (error "Unkonwn" exp))))
+
+
+(define (unless? expr)
+  (tagged-list? expr 'unless))
+
+(define (unless-predicate expr) (cadr expr))
+
+(define (unless-consequence expr) 
+  (if (not (null? (cdddr expr)))
+      (cadddr expr)
+      'false))
+
+(define (unless-alternative expr)
+  (caddr expr))
+
+(define (unless->if expr)
+  (make-if (unless-predicate expr) (unless-consequence expr) (unless-alternative expr)))
+
 
 
 
