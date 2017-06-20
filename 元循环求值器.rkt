@@ -31,7 +31,7 @@
            (procedure-environment procedure))))           ;using a compound procedure could pass the right value from the origin environment.See the lecture video.
         (else
          (error
-          "Unkown procedure type--APPLY" procedure))))
+          "Unknown original 元循环求值器 procedure type--APPLY" procedure))))
 
 (define (eval exp env)
   (cond ((self-evaluating? exp) exp)
@@ -214,8 +214,8 @@
 
 (define (cond-actions clause) (cdr clause))
 
-(define (cond-if exp)
-  (expand-clauses (cond-cluases exp)))
+(define (cond->if exp)
+  (expand-clauses (cond-clauses exp)))
 
 (define (expand-clauses clauses)
   (if (null? clauses)
@@ -328,8 +328,8 @@
         (list '= =)
         (list '* *)
         (list '- -)
-       
-        ))
+       ))
+
 (define (primitive-procedure-names)
   (map car
        primitive-procedures))
@@ -393,7 +393,7 @@
 (define the-global-environment (setup-environment))
 
 
-;;(driver-loop)  
+;(driver-loop)  
 
 
 

@@ -1,5 +1,4 @@
-(load"元循环求值器.rkt")
-
+(load "元循环求值器.rkt")
 (define (eval exp env)
   (cond ((self-evaluating? exp) exp)
         ((variable? exp) (lookup-variable-value exp env))
@@ -17,13 +16,10 @@
         ((cond? exp) (eval (cond->if exp) env))
         ((application? exp)
          (apply (actual-value (operator exp) env)
-                (operands exp)))     ;evaluate the arguments before the extending-environment procedure.
+                (operands exp)
+                env))     ;evaluate the arguments before the extending-environment procedure.
          (else
           (error "Unkonwn" exp))))
-
-
-(define (actual-value exp env)
-  (force-it (eval exp env)))
 
 
 (define (apply procedure arguments env)
@@ -40,21 +36,28 @@
            (procedure-environment procedure))))
         (else
          (error
-          "Unkown procedrue type --APPLY" procedure))))
+          "Unknown procedrue type --APPLY" procedure))))
+
+
+
+(define (actual-value exp env)
+  (force-it (eval exp env)))
+
+
 
 (define (list-of-arg-values exps env)
   (if (no-operands? exps)
       '()
       (cons (actual-value (first-operand exps) env)
-            (list-of-arg-values (rest-operands exps))
-            env)))
+            (list-of-arg-values (rest-operands exps) env))))
 
 (define (list-of-delayed-args exps env)
   (if (no-operands? exps)
       '()
       (cons (delay-it (first-operand exps) env)
-            (list-of-delayed-args (rest-operands exps))
-            env)))
+            (list-of-delayed-args (rest-operands exps)
+            env))))
+
 
 (define (eval-if exp env)
   (if (true? (actual-value (if-predicate exp) env))
@@ -76,10 +79,10 @@
 
 (define the-global-environment (setup-environment))
 
-(define (force-it obj)
+"(define (force-it obj)
   (if (thunk? obj)
       (actual-value (thunk-exp obj) (thunk-env obj))
-      (obj)))
+      (obj)))"
 
 (define (delay-it exp env)
   (list 'thunk exp env))
@@ -91,7 +94,7 @@
 
 (define (thunk-env thunk) (caddr thunk))
 
-(define (evluated-thunk? obj)
+(define (evaluated-thunk? obj)
   (tagged-list? obj 'evaluated-thunk))
 
 (define (thunk-value evaluated-thunk) (cadr evaluated-thunk))
@@ -105,11 +108,11 @@
            (set-car! (cdr obj) result)       ;replace exp with its value
            (set-cdr! (cdr obj) '())          ;forget unneeded env
            result))
-        ((evaluated-thun? obj)
+        ((evaluated-thunk? obj)
          (thunk-value obj))
         (else obj)))
 
-
+;(driver-loop)
 
 
 
